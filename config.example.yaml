@@ -1,0 +1,103 @@
+# TTS Evaluation Pipeline Configuration (Example)
+# Copy this file to config.yaml and customize for your setup
+
+# Device settings
+device: "cuda"  # "cuda" or "cpu"
+gpu_index: 0
+
+# Output directory
+output_dir: "./outputs"
+
+# Models to evaluate
+# Set enabled: false to skip a model
+models:
+  # GLM-TTS - Zero-shot voice cloning
+  - name: "glm_tts"
+    type: "glm_tts"
+    enabled: true
+    model_path: "./GLM-TTS/ckpt"
+    use_phoneme: false
+    use_cache: true
+    # Voice cloning settings
+    prompt_wav: "./processed_audio/your_speaker.wav"
+    prompt_text: "Transcript of your reference audio."
+
+  # GLM-TTS with RL weights
+  - name: "glm_tts_rl"
+    type: "glm_tts_rl"
+    enabled: true
+    model_path: "./GLM-TTS/ckpt"
+    rl_ckpt_path: null  # Uses default if null
+    prompt_wav: "./processed_audio/your_speaker.wav"
+    prompt_text: "Transcript of your reference audio."
+
+  # Qwen3-TTS with preset voices (no reference audio needed)
+  - name: "qwen_tts"
+    type: "qwen_tts"
+    enabled: true
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
+    speaker: "Vivian"  # Available: Vivian, Ethan, Chelsie, ...
+    language: "English"
+    use_flash_attn: true
+
+  # Qwen3-TTS Voice Cloning (requires Base model)
+  - name: "qwen_tts_vc"
+    type: "qwen_tts_vc"
+    enabled: false  # Enable for voice cloning
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    language: "auto"
+    ref_audio: "./processed_audio/your_speaker.wav"
+    ref_text: "Transcript of your reference audio."
+    x_vector_only: false  # true = speaker embedding only, false = ICL mode
+
+  # Qwen3-TTS with vLLM acceleration (Linux only, faster RTF)
+  - name: "qwen_tts_vllm"
+    type: "qwen_tts_vllm_vc"
+    enabled: false  # Set true on Linux for best performance
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    language: "English"
+    ref_audio: "./processed_audio/your_speaker.wav"
+    ref_text: "Transcript of your reference audio."
+    mode: "icl"  # "icl" or "xvec_only"
+    # vLLM-specific parameters
+    temperature: 0.9
+    top_p: 1.0
+    top_k: 50
+    max_tokens: 2048
+    repetition_penalty: 1.05
+
+  # CosyVoice - Zero-shot voice cloning
+  - name: "cosyvoice"
+    type: "cosyvoice"
+    enabled: true
+    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    repo_path: "./CosyVoice"
+    mode: "zero_shot"  # zero_shot, cross_lingual, instruct
+    prompt_wav: "./processed_audio/your_speaker.wav"
+    prompt_text: "Transcript of your reference audio."
+
+  # CosyVoice with RL weights
+  - name: "cosyvoice_rl"
+    type: "cosyvoice_rl"
+    enabled: true
+    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    repo_path: "./CosyVoice"
+    mode: "zero_shot"
+    prompt_wav: "./processed_audio/your_speaker.wav"
+    prompt_text: "Transcript of your reference audio."
+
+# Test scripts file
+# Contains the texts to synthesize for evaluation
+scripts_file: "scripts/sample_scripts.json"
+
+# Fallback inline scripts (used if scripts_file not found)
+scripts:
+  - id: "test_001"
+    text: "Hello, this is a test of the text to speech system."
+  - id: "test_002"
+    text: "The quick brown fox jumps over the lazy dog."
+
+# Resource monitoring settings
+resource_monitor:
+  interval: 0.5  # seconds between samples
+  gpu_index: 0

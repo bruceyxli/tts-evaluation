@@ -1,0 +1,108 @@
+# TTS Evaluation Pipeline Configuration
+
+# Device settings
+device: "cuda"  # "cuda" or "cpu"
+gpu_index: 0
+
+# Output directory
+output_dir: "./outputs"
+
+# Models to evaluate
+models:
+  - name: "glm_tts"
+    type: "glm_tts"
+    enabled: true
+    model_path: "./GLM-TTS/ckpt"
+    use_phoneme: false
+    use_cache: true
+    # Voice cloning with Yang's voice (male)
+    prompt_wav: "./processed_audio/normalized_Yang.wav"
+    prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+
+  - name: "glm_tts_rl"
+    type: "glm_tts_rl"
+    enabled: true
+    model_path: "./GLM-TTS/ckpt"
+    rl_ckpt_path: null  # Uses default if null
+    # Voice cloning with Yang's voice (male)
+    prompt_wav: "./processed_audio/normalized_Yang.wav"
+    prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+
+  - name: "qwen_tts"
+    type: "qwen_tts"
+    enabled: true
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
+    speaker: "Vivian"
+    language: "English"
+    use_flash_attn: true
+
+  # Qwen3-TTS Voice Cloning (requires Base model)
+  - name: "qwen_tts_vc"
+    type: "qwen_tts_vc"
+    enabled: true  # Voice cloning with Yang's voice
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    language: "auto"
+    ref_audio: "./processed_audio/normalized_Yang.wav"
+    ref_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    x_vector_only: false  # If true, only use speaker embedding (no ICL)
+
+  # Qwen3-TTS with vLLM-Omni acceleration + Voice Cloning (Linux/WSL only)
+  - name: "qwen_tts_vllm"
+    type: "qwen_tts_vllm_vc"
+    enabled: true
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"  # Base model for voice cloning
+    language: "English"
+    # Voice cloning with Yang's voice (male)
+    ref_audio: "./processed_audio/normalized_Yang.wav"
+    ref_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    mode: "icl"  # "icl" for in-context learning, "xvec_only" for x-vector only
+    # vLLM-specific parameters
+    temperature: 0.9
+    top_p: 1.0
+    top_k: 50
+    max_tokens: 2048
+    repetition_penalty: 1.05
+
+  # CosyVoice with zero-shot voice cloning
+  - name: "cosyvoice"
+    type: "cosyvoice"
+    enabled: true
+    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    repo_path: "./CosyVoice"
+    mode: "zero_shot"  # zero_shot, cross_lingual, instruct
+    # Voice cloning settings (zero_shot mode)
+    prompt_wav: "./processed_audio/normalized_Yang.wav"
+    prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+
+  - name: "cosyvoice_rl"
+    type: "cosyvoice_rl"
+    enabled: true
+    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    repo_path: "./CosyVoice"
+    mode: "zero_shot"
+    # Voice cloning with Yang's voice (male)
+    prompt_wav: "./processed_audio/normalized_Yang.wav"
+    prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+
+# Test scripts
+# Use --scripts (-s) flag to load from external file
+# Default: scripts/tts_evaluation_dataset.json (40 samples)
+#
+# Usage:
+#   python main.py -s scripts/tts_evaluation_dataset.json
+#
+# Dataset categories: code, notes, math, tutor
+# See scripts/tts_evaluation_dataset.json for full details
+scripts_file: "scripts/tts_evaluation_dataset.json"
+
+# Fallback inline scripts (used if no --scripts flag provided)
+scripts:
+  - id: "test_001"
+    text: "Hello, this is a test of the text to speech system."
+  - id: "test_002"
+    text: "The quick brown fox jumps over the lazy dog."
+
+# Resource monitoring settings
+resource_monitor:
+  interval: 0.5  # seconds between samples
+  gpu_index: 0

@@ -1,0 +1,66 @@
+{
+  "name": "TTS Evaluation Test Scripts",
+  "version": "1.0",
+  "samples": [
+    {
+      "id": "en_short_001",
+      "category": "short",
+      "language": "en",
+      "text": "Hello world."
+    },
+    {
+      "id": "en_short_002",
+      "category": "short",
+      "language": "en",
+      "text": "Thank you very much."
+    },
+    {
+      "id": "en_medium_001",
+      "category": "medium",
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog."
+    },
+    {
+      "id": "en_medium_002",
+      "category": "medium",
+      "language": "en",
+      "text": "Machine learning has transformed how we interact with technology."
+    },
+    {
+      "id": "en_long_001",
+      "category": "long",
+      "language": "en",
+      "text": "Artificial intelligence and machine learning are rapidly evolving fields that continue to push the boundaries of what computers can achieve in understanding and generating human language."
+    },
+    {
+      "id": "en_math_001",
+      "category": "math",
+      "language": "en",
+      "text": "The derivative of x squared is two x."
+    },
+    {
+      "id": "en_math_002",
+      "category": "math",
+      "language": "en",
+      "text": "The integral of one over x is the natural logarithm of x plus a constant."
+    },
+    {
+      "id": "zh_001",
+      "category": "chinese",
+      "language": "zh",
+      "text": "你好，这是一个文字转语音系统的测试。"
+    },
+    {
+      "id": "zh_002",
+      "category": "chinese",
+      "language": "zh",
+      "text": "人工智能正在改变我们的生活方式，让一切变得更加便捷。"
+    },
+    {
+      "id": "mixed_001",
+      "category": "mixed",
+      "language": "mixed",
+      "text": "This AI system 可以处理 both English and 中文。"
+    }
+  ]
+}

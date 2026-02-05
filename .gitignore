@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code local settings
+.claude/
+
+# Model repositories (clone separately)
+GLM-TTS/
+CosyVoice/
+Qwen3-TTS/
+
+# Model checkpoints and weights (large files)
+*.pt
+*.pth
+*.bin
+*.onnx
+*.safetensors
+ckpt/
+checkpoints/
+pretrained_models/
+
+# Output files (generated during evaluation)
+outputs/
+
+# Temporary test files
+test_*.wav
+test_*.log
+*.log
+nul
+
+# Miniconda installer
+Miniconda3-*.sh
+
+# Processed audio (user should prepare their own)
+processed_audio/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/

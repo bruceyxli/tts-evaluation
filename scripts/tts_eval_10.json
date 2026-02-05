@@ -1,0 +1,52 @@
+[
+  {
+    "id": "code_python_001",
+    "category": "code",
+    "text": "def factorial(n):\n    if n == 0:\n        return 1\n    return n * factorial(n - 1)"
+  },
+  {
+    "id": "code_sql_001",
+    "category": "code",
+    "text": "SELECT name, age FROM Person WHERE age > 18 ORDER BY age DESC;"
+  },
+  {
+    "id": "notes_markdown_001",
+    "category": "notes",
+    "text": "# Binary Search Trees\n\n## Definition\nA BST is a binary tree where:\n- Left subtree contains only nodes with keys **less than** the parent\n- Right subtree contains only nodes with keys **greater than** the parent"
+  },
+  {
+    "id": "notes_bullet_001",
+    "category": "notes",
+    "text": "Key Points:\n• Time complexity: O(log n) average case\n• Space complexity: O(n)\n• Best for: sorted data retrieval"
+  },
+  {
+    "id": "math_integral_001",
+    "category": "math",
+    "text": "∫₀^∞ e^(-x²) dx = √π/2"
+  },
+  {
+    "id": "math_quadratic",
+    "category": "math",
+    "text": "x = (-b ± √(b²-4ac)) / 2a"
+  },
+  {
+    "id": "tutor_001",
+    "category": "tutor",
+    "text": "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion on computer vision and deep learning architectures."
+  },
+  {
+    "id": "tutor_002",
+    "category": "tutor",
+    "text": "In this course, we've discussed trees many times. Today, let's explore how binary search trees maintain their balance through rotations."
+  },
+  {
+    "id": "tutor_003",
+    "category": "tutor",
+    "text": "So here's the key insight. When we talk about database indexing, we're essentially trading space for time. The more indexes we create, the faster our queries become, but at the cost of additional storage."
+  },
+  {
+    "id": "tutor_004",
+    "category": "tutor",
+    "text": "Let me explain this with an example. Imagine you have a phone book. Without an index, you'd have to search through every single entry to find someone's number. That's O of n. But with alphabetical ordering, you can use binary search, bringing it down to O of log n."
+  }
+]

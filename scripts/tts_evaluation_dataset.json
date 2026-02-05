@@ -1,0 +1,342 @@
+{
+  "name": "TTS Evaluation Dataset",
+  "version": "2.0",
+  "description": "Multi-category dataset for TTS evaluation - raw code, formulas, and markdown to test model handling capabilities",
+  "categories": ["code", "notes", "math", "tutor"],
+  "domains": ["CS", "Math"],
+  "reference_speakers": {
+    "Yang": {
+      "audio": "processed_audio/normalized_Yang.wav",
+      "transcript": "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    },
+    "DeNero": {
+      "audio": "processed_audio/normalized_DeNero.wav",
+      "transcript": "In this course, we've discussed trees many times."
+    }
+  },
+  "samples": [
+    {
+      "id": "code_python_001",
+      "category": "code",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "CS",
+      "text": "def factorial(n):\n    if n == 0:\n        return 1\n    return n * factorial(n - 1)"
+    },
+    {
+      "id": "code_python_002",
+      "category": "code",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "import numpy as np\nmatrix = np.array([[1, 2, 3], [4, 5, 6]])\ntranspose = matrix.T"
+    },
+    {
+      "id": "code_python_003",
+      "category": "code",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "class BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    \n    def insert(self, value):\n        if self.root is None:\n            self.root = Node(value)\n        elif value < self.root.data:\n            self._insert_left(value)\n        else:\n            self._insert_right(value)"
+    },
+    {
+      "id": "code_java_001",
+      "category": "code",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "CS",
+      "text": "public static void main(String[] args) {\n    System.out.println(\"Hello World\");\n}"
+    },
+    {
+      "id": "code_java_002",
+      "category": "code",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "public class LinkedList<T> {\n    private class Node {\n        T data;\n        Node next;\n    }\n    private Node head;\n    \n    public void add(T value) {\n        Node newNode = new Node();\n        newNode.data = value;\n        newNode.next = head;\n        head = newNode;\n    }\n}"
+    },
+    {
+      "id": "code_c_001",
+      "category": "code",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "CS",
+      "text": "#include <stdio.h>\n\nint main() {\n    printf(\"Hello World\\n\");\n    return 0;\n}"
+    },
+    {
+      "id": "code_c_002",
+      "category": "code",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "struct Node {\n    int data;\n    struct Node* next;\n};\n\nstruct Node* createNode(int value) {\n    struct Node* node = (struct Node*)malloc(sizeof(struct Node));\n    node->data = value;\n    node->next = NULL;\n    return node;\n}"
+    },
+    {
+      "id": "code_sql_001",
+      "category": "code",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "CS",
+      "text": "SELECT name, age FROM Person WHERE age > 18 ORDER BY age DESC;"
+    },
+    {
+      "id": "code_sql_002",
+      "category": "code",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "SELECT department, AVG(salary) AS avg_salary\nFROM employees\nGROUP BY department\nHAVING COUNT(*) > 5\nORDER BY avg_salary DESC\nLIMIT 10;"
+    },
+    {
+      "id": "code_sql_003",
+      "category": "code",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "WITH large_courses AS (\n    SELECT c.num, c.name, e.students\n    FROM courses c\n    INNER JOIN enrollment e ON c.num = e.c_num\n    WHERE e.students > 300\n)\nSELECT * FROM large_courses WHERE name LIKE 'CS%';"
+    },
+
+    {
+      "id": "notes_sql_001",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "CS",
+      "text": "## Relational Model Terminology\n\n| Term | Alias |\n|------|-------|\n| Table | Relation |\n| Row | Tuple, Record |\n| Column | Attribute, Field |"
+    },
+    {
+      "id": "notes_sql_002",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "### SQL Query Execution Order\n\n1. FROM → data source\n2. WHERE → filter rows (before grouping)\n3. GROUP BY → create groups\n4. HAVING → filter groups (after grouping)\n5. SELECT → choose columns\n6. ORDER BY → sort results\n7. LIMIT → restrict rows"
+    },
+    {
+      "id": "notes_sql_003",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "### WHERE vs HAVING\n\n- `WHERE` filters rows **before** grouping\n- `HAVING` filters groups **after** grouping\n\n```sql\nSELECT age, AVG(num_dogs)\nFROM Person\nWHERE age >= 18\nGROUP BY age\nHAVING AVG(num_dogs) > 2\n```"
+    },
+    {
+      "id": "notes_sql_004",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "### Aggregate Functions\n\n| Function | NULL Handling |\n|----------|---------------|\n| COUNT(*) | Includes NULL |\n| COUNT(col) | Ignores NULL |\n| SUM(col) | Ignores NULL |\n| AVG(col) | Ignores NULL |\n| MAX(col) | Ignores NULL |"
+    },
+    {
+      "id": "notes_join_001",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "### JOIN Types\n\n- **INNER JOIN**: Returns only matching rows\n- **LEFT OUTER JOIN**: Left table all + right matches (NULL if no match)\n- **CROSS JOIN**: Cartesian product, size = |A| × |B|"
+    },
+    {
+      "id": "notes_join_002",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "### Correlated Subquery\n\n```sql\nSELECT * FROM enrollment e1\nWHERE students > (\n    SELECT AVG(students)\n    FROM enrollment e2\n    WHERE e1.department = e2.department\n);\n```\n\nExecutes once per outer row → can be slow!"
+    },
+    {
+      "id": "notes_disk_001",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "### Storage Hierarchy\n\n| Level | Speed | Capacity |\n|-------|-------|----------|\n| CPU Cache | ~1 ns | KB-MB |\n| RAM | ~100 ns | GB |\n| SSD | ~0.1 ms | TB |\n| HDD | ~5 ms | TB |"
+    },
+    {
+      "id": "notes_disk_002",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "### Disk I/O Cost\n\n```\nRandom I/O:  N × (seek + rotate + transfer)\nSequential:  1 × (seek + rotate) + N × transfer\n```\n\nSequential is 10-100x faster than random!"
+    },
+    {
+      "id": "notes_disk_003",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "### File Organization Costs (N pages)\n\n| Operation | Heap File | Sorted File |\n|-----------|-----------|-------------|\n| Scan | N | N |\n| Equality | N/2 | log₂N |\n| Range | N | log₂N + matches |\n| Insert | 2 | log₂N + N |"
+    },
+    {
+      "id": "notes_page_001",
+      "category": "notes",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "### Page Layout (Variable-Length Records)\n\n```\n┌────────────────────────────────────┐\n│ Rec1 │ Rec2 │ Free Space │ Footer │\n└────────────────────────────────────┘\n\nFooter: [count][free_ptr][Slot1: offset,len][Slot2: offset,len]...\nRecord ID = (Page#, Slot#)\n```"
+    },
+
+    {
+      "id": "math_001",
+      "category": "math",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "Math",
+      "text": "x² + 2x - 3 = 0"
+    },
+    {
+      "id": "math_002",
+      "category": "math",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "Math",
+      "text": "d/dx(x³) = 3x²"
+    },
+    {
+      "id": "math_003",
+      "category": "math",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "Math",
+      "text": "∫₀^∞ e^(-x²) dx = √π/2"
+    },
+    {
+      "id": "math_004",
+      "category": "math",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "Math",
+      "text": "x = (-b ± √(b² - 4ac)) / 2a"
+    },
+    {
+      "id": "math_005",
+      "category": "math",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "Math",
+      "text": "e^(iπ) + 1 = 0"
+    },
+    {
+      "id": "math_006",
+      "category": "math",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "Math",
+      "text": "∑_{n=1}^{∞} 1/n² = π²/6"
+    },
+    {
+      "id": "math_007",
+      "category": "math",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "Math",
+      "text": "lim_{n→∞} (1 + 1/n)^n = e"
+    },
+    {
+      "id": "math_008",
+      "category": "math",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "O(n log n) < O(n²) < O(2^n) < O(n!)"
+    },
+    {
+      "id": "math_009",
+      "category": "math",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "T(n) = 2T(n/2) + O(n) → T(n) = O(n log n)"
+    },
+    {
+      "id": "math_010",
+      "category": "math",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "Math",
+      "text": "det|a b; c d| = ad - bc"
+    },
+
+    {
+      "id": "tutor_001",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "CS",
+      "text": "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    },
+    {
+      "id": "tutor_002",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "CS",
+      "text": "In this course, we've discussed trees many times. Today, let's explore how binary search trees maintain their balance."
+    },
+    {
+      "id": "tutor_003",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "So here's the key insight. When we talk about database indexing, we're essentially trading space for time. By storing extra information, we can find records much faster than scanning the entire table."
+    },
+    {
+      "id": "tutor_004",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "Let me explain this with an example. Imagine you have a phone book. Without an index, you'd have to look at every single entry. But with alphabetical ordering, you can use binary search and find any name in just a few steps."
+    },
+    {
+      "id": "tutor_005",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "Now, some of you might be wondering, why don't we just keep everything in memory? Great question. The answer is simple: data is often too large to fit in RAM, and we need persistence in case of power failure."
+    },
+    {
+      "id": "tutor_006",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "This brings us to an important concept called locality of reference. Programs tend to access data that's nearby in memory or that was accessed recently. We exploit this with caching strategies like LRU, least recently used."
+    },
+    {
+      "id": "tutor_007",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "easy",
+      "domain": "Math",
+      "text": "Alright class, let's work through this problem step by step. First, we need to identify what type of equation we're dealing with. Is it linear, quadratic, or something else?"
+    },
+    {
+      "id": "tutor_008",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "Math",
+      "text": "Remember, when you see a summation symbol, think of it as a compact way to write repeated addition. The index tells you where to start and stop, and the expression tells you what to add each time."
+    },
+    {
+      "id": "tutor_009",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "medium",
+      "domain": "CS",
+      "text": "Here's a common mistake I see students make. They confuse time complexity with actual running time. Big O notation describes how the algorithm scales, not how fast it runs on any specific input."
+    },
+    {
+      "id": "tutor_010",
+      "category": "tutor",
+      "language": "en",
+      "difficulty": "hard",
+      "domain": "CS",
+      "text": "To summarize today's lecture: we covered join algorithms including nested loop join, hash join, and sort-merge join. Each has different performance characteristics depending on the data size and available memory. For the exam, make sure you can analyze when each approach is optimal."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[
+  {"id": "code_python_001", "text": "def factorial(n):\n    if n == 0:\n        return 1\n    return n * factorial(n - 1)"},
+  {"id": "code_sql_001", "text": "SELECT name, age FROM Person WHERE age > 18 ORDER BY age DESC;"},
+  {"id": "notes_markdown_001", "text": "# Introduction\n\nThis is a **bold** and *italic* text example."},
+  {"id": "notes_bullet_001", "text": "- Item one\n- Item two\n- Item three"},
+  {"id": "math_integral_001", "text": "The integral of x squared from 0 to 1 equals one third."},
+  {"id": "math_quadratic", "text": "The quadratic formula is: x equals negative b plus or minus the square root of b squared minus 4ac, all divided by 2a."},
+  {"id": "tutor_001", "text": "Today we will learn about binary search trees and their applications."},
+  {"id": "tutor_002", "text": "A recursive function calls itself with smaller inputs until it reaches a base case."},
+  {"id": "tutor_003", "text": "The time complexity of quicksort is O of n log n on average."},
+  {"id": "tutor_004", "text": "Hash tables provide constant time lookup on average for key-value pairs."}
+]

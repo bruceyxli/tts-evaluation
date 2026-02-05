@@ -1,0 +1,23 @@
+# vLLM-Omni environment for Qwen3-TTS
+# NOTE: vLLM only supports Linux! Use WSL2 on Windows.
+name: tts-qwen-vllm
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+    # vLLM core (CUDA)
+    - vllm==0.15.0
+    # Audio processing
+    - numpy>=1.24.0
+    - soundfile>=0.12.0
+    - librosa>=0.10.0
+    - scipy>=1.10.0
+    # Utilities
+    - pyyaml>=6.0
+    - tqdm>=4.66.0
+    # vLLM-Omni will be installed from source
