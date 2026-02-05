@@ -45,22 +45,22 @@
       "text": "The integral of one over x is the natural logarithm of x plus a constant."
     },
     {
-      "id": "zh_001",
-      "category": "chinese",
-      "language": "zh",
-      "text": "你好，这是一个文字转语音系统的测试。"
+      "id": "en_conversational_001",
+      "category": "conversational",
+      "language": "en",
+      "text": "Hello, this is a test of the text to speech system."
     },
     {
-      "id": "zh_002",
-      "category": "chinese",
-      "language": "zh",
-      "text": "人工智能正在改变我们的生活方式，让一切变得更加便捷。"
+      "id": "en_conversational_002",
+      "category": "conversational",
+      "language": "en",
+      "text": "Artificial intelligence is changing the way we live, making everything more convenient."
     },
     {
-      "id": "mixed_001",
-      "category": "mixed",
-      "language": "mixed",
-      "text": "This AI system 可以处理 both English and 中文。"
+      "id": "en_technical_001",
+      "category": "technical",
+      "language": "en",
+      "text": "This AI system can process multiple languages and generate natural sounding speech."
     }
   ]
 }
