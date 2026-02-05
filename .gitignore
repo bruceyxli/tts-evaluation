@@ -62,9 +62,6 @@ nul
 # Miniconda installer
 Miniconda3-*.sh
 
-# Processed audio (user should prepare their own)
-processed_audio/
-
 # OS files
 .DS_Store
 Thumbs.db

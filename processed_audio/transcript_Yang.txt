@@ -1,0 +1,1 @@
+Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision.
