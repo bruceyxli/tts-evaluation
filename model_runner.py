@@ -246,31 +246,58 @@ def load_glm_tts_rl(config: dict):
 
 def load_qwen_tts(config: dict):
     """Load Qwen3-TTS model."""
+    import torch
     from qwen_tts import Qwen3TTSModel
 
     model_id = config.get("model_id", "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice")
     device = config.get("device", "cuda")
+    use_flash_attn = config.get("use_flash_attn", True)
 
-    # Note: from_pretrained doesn't accept device param in newer versions
-    # Load model then move to device
-    model = Qwen3TTSModel.from_pretrained(model_id)
-    if hasattr(model, 'to'):
-        model = model.to(device)
+    # Build kwargs for optimized loading
+    load_kwargs = {
+        "device_map": device,
+        "dtype": torch.bfloat16,
+    }
+
+    # Use flash attention if available and enabled
+    if use_flash_attn:
+        try:
+            import flash_attn
+            load_kwargs["attn_implementation"] = "flash_attention_2"
+            print(f"  Using Flash Attention 2", file=sys.stderr)
+        except ImportError:
+            print(f"  flash-attn not installed, using default attention", file=sys.stderr)
+
+    model = Qwen3TTSModel.from_pretrained(model_id, **load_kwargs)
     return model, 24000  # Qwen-TTS uses 24kHz
 
 
 def load_qwen_tts_vc(config: dict):
     """Load Qwen3-TTS Base model for voice cloning."""
+    import torch
     from qwen_tts import Qwen3TTSModel
 
     # Voice cloning requires Base model, not CustomVoice
     model_id = config.get("model_id", "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
     device = config.get("device", "cuda")
+    use_flash_attn = config.get("use_flash_attn", True)
 
-    # Note: from_pretrained doesn't accept device param in newer versions
-    model = Qwen3TTSModel.from_pretrained(model_id)
-    if hasattr(model, 'to'):
-        model = model.to(device)
+    # Build kwargs for optimized loading
+    load_kwargs = {
+        "device_map": device,
+        "dtype": torch.bfloat16,
+    }
+
+    # Use flash attention if available and enabled
+    if use_flash_attn:
+        try:
+            import flash_attn
+            load_kwargs["attn_implementation"] = "flash_attention_2"
+            print(f"  Using Flash Attention 2", file=sys.stderr)
+        except ImportError:
+            print(f"  flash-attn not installed, using default attention", file=sys.stderr)
+
+    model = Qwen3TTSModel.from_pretrained(model_id, **load_kwargs)
     return model, 24000
 
 
