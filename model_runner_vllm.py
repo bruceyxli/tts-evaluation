@@ -35,18 +35,7 @@ def check_vllm_available():
 
 
 class Qwen3TTSQuery:
-    """Query builder for Qwen3-TTS with vLLM-Omni.
-
-    Uses the correct input format for vLLM-Omni:
-    {
-        "prompt": "<|im_start|>assistant\n{text}<|im_end|>\n<|im_start|>assistant\n",
-        "additional_information": {
-            "task_type": [task_type],
-            "text": [text],
-            ...
-        }
-    }
-    """
+    """Query builder for Qwen3-TTS with vLLM-Omni."""
 
     def __init__(self, model_name: str):
         self.model_name = model_name
@@ -61,19 +50,13 @@ class Qwen3TTSQuery:
         elif "Base" in self.model_name:
             self.task_type = "Base"
         else:
-            self.task_type = "CustomVoice"  # Default
+            self.task_type = "CustomVoice"
 
-    def build_custom_voice_input(
-        self,
-        text: str,
-        speaker: str = "Vivian",
-        language: str = "English",
-        instruct: str = "",
-        max_new_tokens: int = 2048,
-    ) -> dict:
+    def build_custom_voice_input(self, text: str, speaker: str = "Vivian",
+                                  language: str = "English", instruct: str = "",
+                                  max_new_tokens: int = 2048) -> dict:
         """Build input for CustomVoice model."""
         prompt = f"<|im_start|>assistant\n{text}<|im_end|>\n<|im_start|>assistant\n"
-
         return {
             "prompt": prompt,
             "additional_information": {
@@ -86,19 +69,11 @@ class Qwen3TTSQuery:
             },
         }
 
-    def build_voice_clone_input(
-        self,
-        text: str,
-        ref_audio: str,
-        ref_text: str = "",
-        language: str = "Auto",
-        mode: str = "icl",
-        max_new_tokens: int = 2048,
-    ) -> dict:
+    def build_voice_clone_input(self, text: str, ref_audio: str, ref_text: str = "",
+                                 language: str = "Auto", mode: str = "icl",
+                                 max_new_tokens: int = 2048) -> dict:
         """Build input for Base model (voice cloning)."""
         prompt = f"<|im_start|>assistant\n{text}<|im_end|>\n<|im_start|>assistant\n"
-        x_vector_only_mode = (mode == "xvec_only")
-
         return {
             "prompt": prompt,
             "additional_information": {
@@ -107,7 +82,7 @@ class Qwen3TTSQuery:
                 "ref_text": [ref_text],
                 "text": [text],
                 "language": [language],
-                "x_vector_only_mode": [x_vector_only_mode],
+                "x_vector_only_mode": [mode == "xvec_only"],
                 "max_new_tokens": [max_new_tokens],
             },
         }
@@ -118,26 +93,20 @@ def load_vllm_model(config: dict):
     from vllm_omni import Omni
 
     model_id = config.get("model_id", "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice")
-    stage_configs_path = config.get("stage_configs_path")
-    enable_stats = config.get("enable_stats", False)
-    stage_init_timeout = config.get("stage_init_timeout", 300)
-
     print(f"Loading vLLM-Omni model: {model_id}", file=sys.stderr)
 
     omni = Omni(
         model=model_id,
-        stage_configs_path=stage_configs_path,
-        log_stats=enable_stats,
-        stage_init_timeout=stage_init_timeout,
+        stage_configs_path=config.get("stage_configs_path"),
+        log_stats=config.get("enable_stats", False),
+        stage_init_timeout=config.get("stage_init_timeout", 300),
     )
-
     return omni, model_id
 
 
 def create_sampling_params(config: dict):
     """Create sampling parameters for vLLM."""
     from vllm import SamplingParams
-
     return SamplingParams(
         temperature=config.get("temperature", 0.9),
         top_p=config.get("top_p", 1.0),
@@ -149,8 +118,66 @@ def create_sampling_params(config: dict):
     )
 
 
-def run_batch_vllm(config: dict, tasks: list, output_dir: Path) -> list:
-    """Run batch synthesis with vLLM-Omni."""
+def run_vllm_single(omni, query_builder, sampling_params, config: dict, tasks: list, output_dir: Path) -> list:
+    """Run TTS synthesis one request at a time (single-batch mode)."""
+    results = []
+
+    print(f"Running single-batch inference for {len(tasks)} samples...", file=sys.stderr)
+
+    for task in tasks:
+        task_id = task["id"]
+        text = task["text"]
+
+        # Build input
+        if query_builder.task_type == "Base":
+            ref_audio = config.get("ref_audio")
+            if not ref_audio:
+                results.append({"id": task_id, "success": False, "error": "ref_audio required"})
+                continue
+            inp = query_builder.build_voice_clone_input(
+                text=text, ref_audio=ref_audio, ref_text=config.get("ref_text", ""),
+                language=config.get("language", "Auto"), mode=config.get("mode", "icl"),
+            )
+        else:
+            inp = query_builder.build_custom_voice_input(
+                text=text, speaker=config.get("speaker", "Vivian"),
+                language=config.get("language", "English"),
+            )
+
+        # Generate single request
+        start_time = time.perf_counter()
+        try:
+            omni_generator = omni.generate([inp], [sampling_params])
+
+            for stage_outputs in omni_generator:
+                for output in stage_outputs.request_output:
+                    generation_time = time.perf_counter() - start_time
+                    audio_tensor = output.outputs[0].multimodal_output["audio"]
+                    sample_rate = output.outputs[0].multimodal_output["sr"].item()
+                    audio = audio_tensor.float().detach().cpu().numpy().flatten()
+
+                    duration = len(audio) / sample_rate
+                    rtf = generation_time / duration if duration > 0 else float('inf')
+
+                    audio_path = output_dir / f"{task_id}.wav"
+                    sf.write(str(audio_path), audio, sample_rate, format="WAV")
+
+                    results.append({
+                        "id": task_id, "success": True, "audio_path": str(audio_path),
+                        "sample_rate": sample_rate, "duration": duration,
+                        "generation_time": generation_time, "rtf": rtf, "backend": "vllm-omni-single",
+                    })
+                    print(f"  {task_id}: RTF={rtf:.3f}, duration={duration:.2f}s", file=sys.stderr)
+
+        except Exception as e:
+            print(f"  {task_id}: Error - {e}", file=sys.stderr)
+            results.append({"id": task_id, "success": False, "error": str(e)})
+
+    return results
+
+
+def run_vllm(config: dict, tasks: list, output_dir: Path) -> list:
+    """Run TTS synthesis with vLLM-Omni."""
     results = []
 
     if not check_vllm_available():
@@ -160,144 +187,99 @@ def run_batch_vllm(config: dict, tasks: list, output_dir: Path) -> list:
     print("Loading vLLM-Omni model...", file=sys.stderr)
     load_start = time.perf_counter()
     omni, model_id = load_vllm_model(config)
-    load_time = time.perf_counter() - load_start
-    print(f"Model loaded in {load_time:.2f}s", file=sys.stderr)
+    print(f"Model loaded in {time.perf_counter() - load_start:.2f}s", file=sys.stderr)
 
-    # Create query builder and sampling params
     query_builder = Qwen3TTSQuery(model_id)
     sampling_params = create_sampling_params(config)
 
-    # Prepare inputs
+    # Check if single-batch mode
+    if config.get("single_batch", False):
+        return run_vllm_single(omni, query_builder, sampling_params, config, tasks, output_dir)
+
+    # Batch mode: prepare all inputs
     inputs_list = []
     for task in tasks:
         text = task["text"]
-
         if query_builder.task_type == "Base":
-            # Voice cloning
             ref_audio = config.get("ref_audio")
-            ref_text = config.get("ref_text", "")
             if not ref_audio:
-                results.append({
-                    "id": task["id"],
-                    "success": False,
-                    "error": "ref_audio required for voice cloning",
-                })
+                results.append({"id": task["id"], "success": False, "error": "ref_audio required"})
                 continue
-
             inp = query_builder.build_voice_clone_input(
-                text=text,
-                ref_audio=ref_audio,
-                ref_text=ref_text,
-                language=config.get("language", "Auto"),
-                mode=config.get("mode", "icl"),
+                text=text, ref_audio=ref_audio, ref_text=config.get("ref_text", ""),
+                language=config.get("language", "Auto"), mode=config.get("mode", "icl"),
             )
         else:
-            # CustomVoice or VoiceDesign
             inp = query_builder.build_custom_voice_input(
-                text=text,
-                speaker=config.get("speaker", "Vivian"),
+                text=text, speaker=config.get("speaker", "Vivian"),
                 language=config.get("language", "English"),
-                instruct=config.get("instruct", ""),
             )
-
         inputs_list.append((task["id"], inp))
 
     if not inputs_list:
         return results
 
-    # Run batch inference
     print(f"Running batch inference for {len(inputs_list)} samples...", file=sys.stderr)
     batch_start = time.perf_counter()
 
-    # Prepare for vLLM generate
+    # Generate all at once
     all_inputs = [inp for _, inp in inputs_list]
-
-    # Generate - vLLM-Omni expects a single sampling_params for the batch
-    omni_generator = omni.generate(all_inputs, [sampling_params])
-
-    # Map request index to task_id (request_id format is "idx_uuid")
     task_id_map = {i: task_id for i, (task_id, _) in enumerate(inputs_list)}
-    task_start_times = {task_id: batch_start for task_id, _ in inputs_list}
+
+    omni_generator = omni.generate(all_inputs, [sampling_params])
 
     for stage_outputs in omni_generator:
         for output in stage_outputs.request_output:
             try:
-                # request_id format: "idx_uuid", extract idx
-                request_id_str = output.request_id
-                request_idx = int(request_id_str.split("_")[0])
+                request_idx = int(output.request_id.split("_")[0])
                 task_id = task_id_map.get(request_idx)
                 if task_id is None:
                     continue
 
-                generation_time = time.perf_counter() - task_start_times[task_id]
-
-                # Extract audio
+                generation_time = time.perf_counter() - batch_start
                 audio_tensor = output.outputs[0].multimodal_output["audio"]
                 sample_rate = output.outputs[0].multimodal_output["sr"].item()
-                audio = audio_tensor.float().detach().cpu().numpy()
-
-                if audio.ndim > 1:
-                    audio = audio.flatten()
+                audio = audio_tensor.float().detach().cpu().numpy().flatten()
 
                 duration = len(audio) / sample_rate
                 rtf = generation_time / duration if duration > 0 else float('inf')
 
-                # Save audio
                 audio_path = output_dir / f"{task_id}.wav"
                 sf.write(str(audio_path), audio, sample_rate, format="WAV")
 
                 results.append({
-                    "id": task_id,
-                    "success": True,
-                    "audio_path": str(audio_path),
-                    "sample_rate": sample_rate,
-                    "duration": duration,
-                    "generation_time": generation_time,
-                    "rtf": rtf,
-                    "backend": "vllm-omni",
+                    "id": task_id, "success": True, "audio_path": str(audio_path),
+                    "sample_rate": sample_rate, "duration": duration,
+                    "generation_time": generation_time, "rtf": rtf, "backend": "vllm-omni",
                 })
-
                 print(f"  {task_id}: RTF={rtf:.3f}, duration={duration:.2f}s", file=sys.stderr)
 
             except Exception as e:
-                task_id = task_id_map.get(int(output.request_id), "unknown")
+                task_id = task_id_map.get(int(output.request_id.split("_")[0]), "unknown")
                 print(f"  {task_id}: Error - {e}", file=sys.stderr)
-                results.append({
-                    "id": task_id,
-                    "success": False,
-                    "error": str(e),
-                })
+                results.append({"id": task_id, "success": False, "error": str(e)})
 
-    batch_time = time.perf_counter() - batch_start
-    print(f"Batch completed in {batch_time:.2f}s", file=sys.stderr)
-
+    print(f"Batch completed in {time.perf_counter() - batch_start:.2f}s", file=sys.stderr)
     return results
 
 
 def main():
     parser = argparse.ArgumentParser(description="vLLM-Omni TTS Model Runner")
-    parser.add_argument("--model", "-m", required=True, help="Model type (qwen_tts_vllm)")
+    parser.add_argument("--model", "-m", required=True, help="Model type")
     parser.add_argument("--config", "-c", required=True, help="Config JSON file")
     parser.add_argument("--tasks", "-t", required=True, help="Tasks JSON file")
     parser.add_argument("--output", "-o", required=True, help="Output directory")
     args = parser.parse_args()
 
-    # Load config
     with open(args.config, "r", encoding="utf-8") as f:
         config = json.load(f)
-
-    # Load tasks
     with open(args.tasks, "r", encoding="utf-8") as f:
         tasks = json.load(f)
 
-    # Create output directory
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Run batch
-    results = run_batch_vllm(config, tasks, output_dir)
-
-    # Output results as JSON to stdout
+    results = run_vllm(config, tasks, output_dir)
     print(json.dumps(results, ensure_ascii=False))
 
 

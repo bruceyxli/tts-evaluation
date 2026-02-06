@@ -11,6 +11,8 @@ from typing import Dict, List, Optional
 
 import yaml
 
+from metrics.resource import ResourceMonitor
+
 # Model type to conda environment mapping
 MODEL_ENV_MAP = {
     "glm_tts": "tts-glm",
@@ -21,6 +23,7 @@ MODEL_ENV_MAP = {
     "qwen_tts_vllm_vc": "tts-qwen-vllm",  # vLLM voice cloning
     "cosyvoice": "tts-cosyvoice",
     "cosyvoice_rl": "tts-cosyvoice",
+    "cosyvoice_vllm": "tts-cosyvoice-vllm",  # CosyVoice with vLLM acceleration (Linux only)
 }
 
 # Model types that use vLLM runner
@@ -36,18 +39,59 @@ class TTSPipeline:
         self.output_base = Path(config.get("output_dir", "./outputs"))
         self.project_root = Path(__file__).parent.resolve()
 
+        # Resource monitoring config
+        rm_config = config.get("resource_monitor", {})
+        self.monitor_interval = rm_config.get("interval", 0.5)
+        self.monitor_gpu_index = rm_config.get("gpu_index", 0)
+
     def _get_conda_exe(self) -> str:
         """Get conda executable path."""
         return os.environ.get("CONDA_EXE", "conda")
 
-    def _create_output_dir(self, model_names: List[str]) -> Path:
-        """Create timestamped output directory."""
+    def _archive_model_outputs(self, model_names: List[str]):
+        """Archive only the specified models' outputs to history/."""
+        import shutil
+
+        latest_dir = self.output_base / "latest"
+        history_dir = self.output_base / "history"
+
+        if not latest_dir.exists():
+            return  # Nothing to archive
+
+        # Check which models need archiving
+        models_to_archive = []
+        for name in model_names:
+            model_dir = latest_dir / name
+            if model_dir.exists() and model_dir.is_dir():
+                models_to_archive.append(name)
+
+        if not models_to_archive:
+            return  # Nothing to archive
+
+        # Create timestamped archive folder
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        models_str = "-".join(sorted(model_names))
-        dir_name = f"{timestamp}_{models_str}"
-        output_dir = self.output_base / dir_name
-        output_dir.mkdir(parents=True, exist_ok=True)
-        return output_dir
+        archive_dir = history_dir / timestamp
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        # Move only the specified model folders to archive
+        for name in models_to_archive:
+            src = latest_dir / name
+            dst = archive_dir / name
+            shutil.move(str(src), str(dst))
+            print(f"  Archived {name}/ -> history/{timestamp}/{name}/")
+
+    def _setup_output_dir(self, model_names: List[str]) -> Path:
+        """Setup output directory structure. Returns the latest/ path."""
+        self.output_base.mkdir(parents=True, exist_ok=True)
+
+        # Create latest/ directory if not exists
+        latest_dir = self.output_base / "latest"
+        latest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Archive only the models we're about to run
+        self._archive_model_outputs(model_names)
+
+        return latest_dir
 
     def _generate_report(self, all_results: Dict, output_dir: Path):
         """Generate a comparison report in markdown table format."""
@@ -117,8 +161,18 @@ class TTSPipeline:
                 f"- Successful: {data['success']}",
                 f"- Failed: {data['failed']}",
                 f"- Audio files generated: {data['audio_files']}",
-                "",
             ])
+
+            # Add resource usage if available
+            if "resource_usage" in data:
+                rs = data["resource_usage"]
+                report_lines.append(f"- CPU usage: mean {rs['cpu_percent']['mean']:.1f}%, max {rs['cpu_percent']['max']:.1f}%")
+                if "gpu_percent" in rs:
+                    report_lines.append(f"- GPU usage: mean {rs['gpu_percent']['mean']:.1f}%, max {rs['gpu_percent']['max']:.1f}%")
+                if "gpu_memory_mb" in rs:
+                    report_lines.append(f"- GPU memory: mean {rs['gpu_memory_mb']['mean']:.0f}MB, max {rs['gpu_memory_mb']['max']:.0f}MB")
+
+            report_lines.append("")
 
         report_content = "\n".join(report_lines)
 
@@ -216,12 +270,20 @@ class TTSPipeline:
             print(f"  Running in environment: {env_name}")
             print(f"  Command: {' '.join(cmd)}")
 
+            # Prepare environment variables
+            env = os.environ.copy()
+            if model_type == "cosyvoice_vllm":
+                # Set compiler paths for triton compilation in vLLM
+                env["CC"] = "x86_64-conda-linux-gnu-gcc"
+                env["CXX"] = "x86_64-conda-linux-gnu-g++"
+
             # Run subprocess
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 cwd=str(self.project_root),
+                env=env,
             )
 
             # Print stderr (progress info)
@@ -297,9 +359,9 @@ class TTSPipeline:
                 task_id = script.get("id", f"sample_{i:03d}")
                 tasks.append({"id": task_id, "text": script.get("text", "")})
 
-        # Create output directory
+        # Setup output directory (archives existing outputs)
         model_names = [m["name"] for m in model_configs]
-        output_dir = self._create_output_dir(model_names)
+        output_dir = self._setup_output_dir(model_names)
         print(f"Output directory: {output_dir}")
 
         # Save scripts to output
@@ -323,8 +385,18 @@ class TTSPipeline:
             model_dir = output_dir / name
             model_dir.mkdir(exist_ok=True)
 
+            # Start resource monitoring
+            monitor = ResourceMonitor(
+                interval=self.monitor_interval,
+                gpu_index=self.monitor_gpu_index,
+            )
+            monitor.start()
+
             # Run in isolated environment
             results = self._run_model_in_env(model_type, mc, tasks, model_dir)
+
+            # Stop monitoring and get stats
+            resource_stats = monitor.stop()
 
             # Aggregate results
             successful = [r for r in results if r.get("success", False)]
@@ -347,6 +419,7 @@ class TTSPipeline:
                     "min": min(ftl_values) if ftl_values else None,
                     "max": max(ftl_values) if ftl_values else None,
                 },
+                "resource_usage": resource_stats.to_dict(),
                 "audio_files": len(list(model_dir.glob("*.wav"))),
                 "details": results,
             }
@@ -360,6 +433,15 @@ class TTSPipeline:
                 print(f"  First Token Latency: mean={all_results[name]['first_token_latency']['mean']:.3f}s, "
                       f"min={all_results[name]['first_token_latency']['min']:.3f}s, "
                       f"max={all_results[name]['first_token_latency']['max']:.3f}s")
+
+            # Print resource usage
+            rs = all_results[name]["resource_usage"]
+            print(f"  Resource: CPU={rs['cpu_percent']['mean']:.1f}% (max {rs['cpu_percent']['max']:.1f}%)", end="")
+            if "gpu_percent" in rs:
+                print(f", GPU={rs['gpu_percent']['mean']:.1f}% (max {rs['gpu_percent']['max']:.1f}%)", end="")
+            if "gpu_memory_mb" in rs:
+                print(f", VRAM={rs['gpu_memory_mb']['mean']:.0f}MB (max {rs['gpu_memory_mb']['max']:.0f}MB)", end="")
+            print()
 
         # Save final metrics
         metrics_output = output_dir / "metrics.json"

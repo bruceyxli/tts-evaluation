@@ -16,6 +16,7 @@
 | `qwen_tts_vllm_vc` | `tts-qwen-vllm` | vLLM Voice Cloning (Linux only) |
 | `cosyvoice` | `tts-cosyvoice` | CosyVoice (Fun-CosyVoice3-0.5B) |
 | `cosyvoice_rl` | `tts-cosyvoice` | CosyVoice + RL 权重 (llm.rl.pt) |
+| `cosyvoice_vllm` | `tts-cosyvoice-vllm` | vLLM 加速 (Linux only) |
 
 ### 关键文件
 
@@ -106,7 +107,29 @@ conda run -n tts-glm python -c "import torch; print(torch.cuda.is_available())"
 - 流式合成时，首个音频 chunk 返回的延迟时间
 - 反映模型的响应速度，对实时交互场景很重要
 - 对于不支持流式的模型返回 `null`
-- CosyVoice 原生支持流式，GLM-TTS 和 Qwen-TTS 需要模型实现 `synthesize_stream()` 方法
+- CosyVoice 原生支持流式
+
+### Streaming 支持现状
+
+| 模型 | 本地 Streaming | 说明 |
+|------|---------------|------|
+| CosyVoice | ✅ 支持 | `inference_bistream()` 原生支持 |
+| GLM-TTS | ⚠️ 可实现 | 有 `token2wav_stream()` 但需要额外集成 |
+| Qwen3-TTS | ❌ 不支持 | qwen-tts 库不暴露 streaming API |
+
+#### Qwen3-TTS Streaming 说明
+
+虽然 Qwen3-TTS 模型架构支持 "Dual-Track Hybrid Streaming" (双轨混合流式)，但 **qwen-tts Python 库不支持本地 streaming 输出**：
+
+- `generate_custom_voice()` 和 `generate_voice_clone()` 返回完整音频，不是 generator
+- `non_streaming_mode` 参数仅控制**文本输入**的模拟流式，不影响音频输出
+- Qwen 官方确认：qwen-tts 库专注于 "quick demos, rapid prototyping, and batch offline inference"
+
+**获取 Streaming 的方式**：
+1. **DashScope Real-time API** (阿里云): 支持真正的流式输出，需要云服务账号
+2. **vLLM-Omni** (计划中): 官方正在开发 Online Serving 支持
+
+**参考**: [GitHub Issue #10](https://github.com/QwenLM/Qwen3-TTS/issues/10) - Qwen 团队官方回复
 
 ## Voice Cloning (声音克隆)
 
@@ -309,12 +332,63 @@ models:
   mode: "icl"  # "icl" 或 "xvec_only"
 ```
 
+#### 测试单请求性能
+
+使用只有 1 个 sample 的 dataset：
+
+```bash
+# 创建单样本测试文件
+echo '[{"id": "single_001", "text": "Hello world."}]' > scripts/single_test.json
+
+# 运行
+python main.py -m qwen_tts_vllm -s scripts/single_test.json
+```
+
 #### RTF 性能对比
 
 | 后端 | RTF (典型值) | 优势 |
 |------|-------------|------|
 | `qwen-tts` 原生 | ~0.3-0.5 | 简单、稳定 |
-| `vLLM-Omni` | ~0.1-0.2 | 更快，支持批量 |
+| `vLLM-Omni` (batch) | ~0.1-0.2 | 更快，支持批量 |
+| `vLLM-Omni` (single) | ~0.2-0.3 | 测量单请求开销 |
+
+### CosyVoice vLLM 加速
+
+**✅ 状态：可用** - 稳态 RTF ~0.2-0.4
+
+CosyVoice vLLM 现在可以正常运行，稳态性能与普通 CosyVoice 相当。
+
+```yaml
+# 标准模式（streaming）
+- name: "cosyvoice_vllm"
+  type: "cosyvoice_vllm"
+  enabled: false
+  model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+  repo_path: "./CosyVoice"
+
+# 单请求模式（non-streaming，更准确的 per-request 指标）
+- name: "cosyvoice_vllm_single"
+  type: "cosyvoice_vllm"
+  enabled: false
+  single_batch: true  # 禁用 streaming，每次请求独立测量
+  model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+  repo_path: "./CosyVoice"
+```
+
+**环境要求**：
+- 使用独立环境 `tts-cosyvoice-vllm`
+- 安装 conda gcc 编译器：`gcc_linux-64`, `gxx_linux-64`
+- 安装 `onnxruntime-gpu`（关键！否则 RTF 会很差）
+- ruamel.yaml 版本限制：`>=0.17.28,<0.19`
+
+**性能特点**：
+- 首次运行有 ~30 秒预热（CUDA Graph 编译 + prompt 处理）
+- 稳态 RTF ~0.2-0.4（与普通 CosyVoice 相当）
+- 批量处理时可能有优势
+
+**WSL 注意事项**：
+- vLLM 在 WSL 下使用 `pin_memory=False`
+- 确保安装 `onnxruntime-gpu` 而非 `onnxruntime`
 
 ### 环境依赖对照
 
@@ -324,6 +398,7 @@ models:
 | `tts-qwen` | `envs/qwen_tts.yaml` | `qwen-tts` PyPI 包 | All | ✅ |
 | `tts-qwen-vllm` | `envs/qwen_tts_vllm.yaml` | vLLM-Omni | Linux | ✅ |
 | `tts-cosyvoice` | `envs/cosyvoice.yaml` | CosyVoice/requirements.txt | All | ✅ |
+| `tts-cosyvoice-vllm` | `envs/cosyvoice_vllm.yaml` | vLLM + CosyVoice | Linux | ✅ |
 
 ### 关键依赖版本
 

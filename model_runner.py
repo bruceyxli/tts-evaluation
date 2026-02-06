@@ -336,6 +336,40 @@ def load_cosyvoice_rl(config: dict):
     return model, model.sample_rate
 
 
+def load_cosyvoice_vllm(config: dict):
+    """Load CosyVoice with vLLM acceleration (Linux only).
+
+    Note: vLLM backend is incompatible with inference_bistream().
+    Standard inference_zero_shot() with stream=True works fine.
+    """
+    repo_path = Path(config.get("repo_path", "./CosyVoice")).resolve()
+    sys.path.insert(0, str(repo_path))
+    sys.path.insert(0, str(repo_path / "third_party" / "Matcha-TTS"))
+
+    # Register vLLM model class
+    try:
+        from vllm import ModelRegistry
+        from cosyvoice.vllm.cosyvoice2 import CosyVoice2ForCausalLM
+        ModelRegistry.register_model("CosyVoice2ForCausalLM", CosyVoice2ForCausalLM)
+    except ImportError as e:
+        print(f"Warning: vLLM registration failed: {e}", file=sys.stderr)
+
+    from cosyvoice.cli.cosyvoice import AutoModel
+
+    model_path = config.get("model_path", "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B")
+    fp16 = config.get("fp16", False)
+    load_trt = config.get("load_trt", False)
+
+    print(f"Loading CosyVoice with vLLM acceleration...", file=sys.stderr)
+    model = AutoModel(
+        model_dir=str(model_path),
+        load_vllm=True,
+        load_trt=load_trt,
+        fp16=fp16,
+    )
+    return model, model.sample_rate
+
+
 MODEL_LOADERS = {
     "glm_tts": load_glm_tts,
     "glm_tts_rl": load_glm_tts_rl,
@@ -343,6 +377,7 @@ MODEL_LOADERS = {
     "qwen_tts_vc": load_qwen_tts_vc,
     "cosyvoice": load_cosyvoice,
     "cosyvoice_rl": load_cosyvoice_rl,
+    "cosyvoice_vllm": load_cosyvoice_vllm,
 }
 
 
@@ -385,11 +420,11 @@ def synthesize_qwen(model, text: str, config: dict) -> tuple[np.ndarray, float]:
 
     Returns:
         tuple: (audio_array, first_token_latency)
-               For non-streaming: time to complete audio (same as generation_time)
+               qwen-tts library does NOT support true streaming, so first_token_latency
+               is returned as None to distinguish from streaming models like CosyVoice.
     """
     speaker = config.get("speaker", "Vivian")
     language = config.get("language", "English")
-    start_time = time.perf_counter()
 
     # Use generate_custom_voice for CustomVoice model
     # Returns: (wavs, sample_rate)
@@ -398,7 +433,6 @@ def synthesize_qwen(model, text: str, config: dict) -> tuple[np.ndarray, float]:
         speaker=speaker,
         language=language,
     )
-    first_token_latency = time.perf_counter() - start_time
 
     # wavs is a list of tensors, concatenate them
     if isinstance(wavs, list):
@@ -409,7 +443,8 @@ def synthesize_qwen(model, text: str, config: dict) -> tuple[np.ndarray, float]:
     if hasattr(audio, 'cpu'):
         audio = audio.cpu().numpy()
 
-    return audio.flatten(), first_token_latency
+    # Return None for first_token_latency since qwen-tts doesn't support true streaming
+    return audio.flatten(), None
 
 
 def synthesize_qwen_vc(model, text: str, config: dict) -> tuple[np.ndarray, float]:
@@ -417,8 +452,8 @@ def synthesize_qwen_vc(model, text: str, config: dict) -> tuple[np.ndarray, floa
 
     Returns:
         tuple: (audio_array, first_token_latency)
-               For streaming: time to first audio chunk
-               For non-streaming: time to complete audio
+               qwen-tts library does NOT support true streaming, so first_token_latency
+               is returned as None to distinguish from streaming models like CosyVoice.
     """
     language = config.get("language", "auto")
     ref_audio = config.get("ref_audio")
@@ -428,43 +463,20 @@ def synthesize_qwen_vc(model, text: str, config: dict) -> tuple[np.ndarray, floa
     if not ref_audio:
         raise ValueError("ref_audio is required for voice cloning")
 
-    start_time = time.perf_counter()
+    # qwen-tts does not support streaming - generate complete audio
+    wavs, sr = model.generate_voice_clone(
+        text=text,
+        language=language,
+        ref_audio=ref_audio,
+        ref_text=ref_text,
+        x_vector_only_mode=x_vector_only,
+    )
+    audio = wavs[0] if isinstance(wavs, list) else wavs
+    if hasattr(audio, 'cpu'):
+        audio = audio.cpu().numpy()
 
-    # Check if model supports streaming voice cloning
-    if hasattr(model, 'generate_voice_clone_stream'):
-        first_token_latency = None
-        audio_chunks = []
-        for chunk in model.generate_voice_clone_stream(
-            text=text,
-            language=language,
-            ref_audio=ref_audio,
-            ref_text=ref_text,
-            x_vector_only_mode=x_vector_only,
-        ):
-            if first_token_latency is None:
-                first_token_latency = time.perf_counter() - start_time
-            if hasattr(chunk, 'cpu'):
-                chunk = chunk.cpu().numpy()
-            audio_chunks.append(chunk.flatten())
-        if audio_chunks:
-            audio = np.concatenate(audio_chunks)
-        else:
-            audio = np.array([], dtype=np.float32)
-        return audio, first_token_latency
-    else:
-        # Non-streaming fallback
-        wavs, sr = model.generate_voice_clone(
-            text=text,
-            language=language,
-            ref_audio=ref_audio,
-            ref_text=ref_text,
-            x_vector_only_mode=x_vector_only,
-        )
-        first_token_latency = time.perf_counter() - start_time
-        audio = wavs[0] if isinstance(wavs, list) else wavs
-        if hasattr(audio, 'cpu'):
-            audio = audio.cpu().numpy()
-        return audio.flatten(), first_token_latency
+    # Return None for first_token_latency since qwen-tts doesn't support true streaming
+    return audio.flatten(), None
 
 
 def synthesize_cosyvoice(model, text: str, config: dict) -> tuple[np.ndarray, float]:
@@ -521,6 +533,67 @@ def synthesize_cosyvoice(model, text: str, config: dict) -> tuple[np.ndarray, fl
     return np.array([], dtype=np.float32), first_token_latency
 
 
+def synthesize_cosyvoice_vllm(model, text: str, config: dict) -> tuple[np.ndarray, float]:
+    """Synthesize with CosyVoice vLLM backend.
+
+    Supports single_batch mode for per-request performance measurement.
+
+    Returns:
+        tuple: (audio_array, first_token_latency)
+    """
+    import torch
+
+    single_batch = config.get("single_batch", False)
+    mode = config.get("mode", "zero_shot")
+
+    # Default prompt settings
+    model_path = Path(config.get("model_path", "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"))
+    prompt_wav = config.get("prompt_wav") or str(model_path / "asset" / "zero_shot_prompt.wav")
+    prompt_text = config.get("prompt_text") or "You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。"
+
+    start_time = time.perf_counter()
+
+    # For single_batch mode, use stream=False to get complete audio at once
+    # This avoids streaming overhead and gives cleaner per-request metrics
+    use_stream = not single_batch
+
+    if mode == "instruct":
+        instruct = config.get("instruct", "请用普通话朗读。")
+        output = model.inference_instruct2(
+            tts_text=text,
+            instruct_text=instruct,
+            prompt_wav=prompt_wav,
+            stream=use_stream,
+        )
+    elif mode == "cross_lingual":
+        output = model.inference_cross_lingual(
+            tts_text=text,
+            prompt_wav=prompt_wav,
+            stream=use_stream,
+        )
+    else:  # zero_shot (default)
+        output = model.inference_zero_shot(
+            tts_text=text,
+            prompt_text=prompt_text,
+            prompt_wav=prompt_wav,
+            stream=use_stream,
+        )
+
+    # Collect audio
+    audio_chunks = []
+    first_token_latency = None
+
+    for chunk in output:
+        if first_token_latency is None:
+            first_token_latency = time.perf_counter() - start_time
+        audio_chunks.append(chunk['tts_speech'])
+
+    if audio_chunks:
+        audio = torch.cat(audio_chunks, dim=1).squeeze().cpu().numpy()
+        return audio, first_token_latency
+    return np.array([], dtype=np.float32), first_token_latency
+
+
 SYNTHESIZERS = {
     "glm_tts": synthesize_glm,
     "glm_tts_rl": synthesize_glm,
@@ -528,6 +601,7 @@ SYNTHESIZERS = {
     "qwen_tts_vc": synthesize_qwen_vc,
     "cosyvoice": synthesize_cosyvoice,
     "cosyvoice_rl": synthesize_cosyvoice,
+    "cosyvoice_vllm": synthesize_cosyvoice_vllm,  # vLLM backend with single_batch support
 }
 
 

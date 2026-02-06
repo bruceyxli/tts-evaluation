@@ -63,6 +63,22 @@ models:
     max_tokens: 2048
     repetition_penalty: 1.05
 
+  # Qwen3-TTS vLLM single-batch mode (one request at a time)
+  - name: "qwen_tts_vllm_single"
+    type: "qwen_tts_vllm_vc"
+    enabled: false  # Enable for single-batch vs batch comparison
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    language: "English"
+    ref_audio: "./processed_audio/normalized_Yang.wav"
+    ref_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    mode: "icl"
+    single_batch: true  # Process one request at a time
+    temperature: 0.9
+    top_p: 1.0
+    top_k: 50
+    max_tokens: 2048
+    repetition_penalty: 1.05
+
   # CosyVoice with zero-shot voice cloning
   - name: "cosyvoice"
     type: "cosyvoice"
@@ -81,6 +97,35 @@ models:
     repo_path: "./CosyVoice"
     mode: "zero_shot"
     # Voice cloning with Yang's voice (male)
+    prompt_wav: "./processed_audio/normalized_Yang.wav"
+    prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+
+
+  # CosyVoice with vLLM acceleration (Linux/WSL only)
+  # NOTE: First run has ~30s warmup, then RTF ~0.2-0.4 (stable state)
+  # Requires onnxruntime-gpu for best performance
+  - name: "cosyvoice_vllm"
+    type: "cosyvoice_vllm"
+    enabled: false  # Enable for vLLM comparison test
+    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    repo_path: "./CosyVoice"
+    mode: "zero_shot"
+    fp16: false
+    load_trt: false
+    # Voice cloning with Yang's voice (male)
+    prompt_wav: "./processed_audio/normalized_Yang.wav"
+    prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+
+  # CosyVoice vLLM single-batch mode (one request at a time)
+  - name: "cosyvoice_vllm_single"
+    type: "cosyvoice_vllm"
+    enabled: false  # Enable for single-batch vs batch comparison
+    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    repo_path: "./CosyVoice"
+    mode: "zero_shot"
+    fp16: false
+    load_trt: false
+    single_batch: true  # Process one request at a time (no streaming)
     prompt_wav: "./processed_audio/normalized_Yang.wav"
     prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
 
