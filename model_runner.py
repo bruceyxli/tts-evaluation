@@ -10,12 +10,40 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import soundfile as sf
+import torch
+
+
+def _torchaudio_load_soundfile(filepath, *args, **kwargs):
+    """Replacement for torchaudio.load using soundfile backend.
+
+    Workaround for torchcodec ABI mismatch with PyTorch 2.9.0+cu128.
+    """
+    data, sr = sf.read(str(filepath))
+    waveform = torch.from_numpy(data).float()
+    if waveform.dim() == 1:
+        waveform = waveform.unsqueeze(0)
+    else:
+        waveform = waveform.T
+    return waveform, sr
+
+
+# Monkey-patch torchaudio.load if torchcodec is broken
+try:
+    import torchaudio
+    torchaudio.load("/dev/null")
+except Exception:
+    try:
+        import torchaudio
+        torchaudio.load = _torchaudio_load_soundfile
+    except ImportError:
+        pass
 
 
 class GLMTTSWrapper:
@@ -346,13 +374,18 @@ def load_cosyvoice_vllm(config: dict):
     sys.path.insert(0, str(repo_path))
     sys.path.insert(0, str(repo_path / "third_party" / "Matcha-TTS"))
 
-    # Register vLLM model class
-    try:
-        from vllm import ModelRegistry
-        from cosyvoice.vllm.cosyvoice2 import CosyVoice2ForCausalLM
-        ModelRegistry.register_model("CosyVoice2ForCausalLM", CosyVoice2ForCausalLM)
-    except ImportError as e:
-        print(f"Warning: vLLM registration failed: {e}", file=sys.stderr)
+    # Set PYTHONPATH so vLLM subprocess can find cosyvoice module
+    existing_pythonpath = os.environ.get("PYTHONPATH", "")
+    new_paths = f"{repo_path}:{repo_path / 'third_party' / 'Matcha-TTS'}"
+    os.environ["PYTHONPATH"] = f"{new_paths}:{existing_pythonpath}" if existing_pythonpath else new_paths
+
+    # Ensure conda env lib path is in LD_LIBRARY_PATH for ffmpeg/torchcodec
+    conda_prefix = os.environ.get("CONDA_PREFIX", "")
+    if conda_prefix:
+        conda_lib = os.path.join(conda_prefix, "lib")
+        existing_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        if conda_lib not in existing_ld:
+            os.environ["LD_LIBRARY_PATH"] = f"{conda_lib}:{existing_ld}" if existing_ld else conda_lib
 
     from cosyvoice.cli.cosyvoice import AutoModel
 

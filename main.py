@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -24,10 +25,15 @@ MODEL_ENV_MAP = {
     "cosyvoice": "tts-cosyvoice",
     "cosyvoice_rl": "tts-cosyvoice",
     "cosyvoice_vllm": "tts-cosyvoice-vllm",  # CosyVoice with vLLM acceleration (Linux only)
+    "qwen_tts_api": None,      # API-based, no conda env needed
+    "qwen_tts_api_vc": None,   # API-based, no conda env needed
 }
 
 # Model types that use vLLM runner
 VLLM_MODEL_TYPES = {"qwen_tts_vllm", "qwen_tts_vllm_vc"}
+
+# Model types that use API runner (no conda environment needed)
+API_MODEL_TYPES = {"qwen_tts_api", "qwen_tts_api_vc"}
 
 
 class TTSPipeline:
@@ -220,6 +226,78 @@ class TTSPipeline:
             {"id": "test_002", "text": "The quick brown fox jumps over the lazy dog."},
         ])
 
+    def _run_api_model(
+        self,
+        model_type: str,
+        model_config: dict,
+        tasks: List[dict],
+        output_dir: Path,
+    ) -> List[dict]:
+        """Run model synthesis via API (no conda environment needed)."""
+        runner_script = self.project_root / "model_runner_api.py"
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as config_file:
+            full_config = {**model_config, "device": self.device}
+            json.dump(full_config, config_file, ensure_ascii=False)
+            config_path = config_file.name
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as tasks_file:
+            json.dump(tasks, tasks_file, ensure_ascii=False)
+            tasks_path = tasks_file.name
+
+        try:
+            cmd = [
+                sys.executable,
+                str(runner_script),
+                "--model", model_type,
+                "--config", config_path,
+                "--tasks", tasks_path,
+                "--output", str(output_dir.resolve()),
+            ]
+
+            print(f"  Using API backend (no conda environment)")
+            print(f"  Command: {' '.join(cmd)}")
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=str(self.project_root),
+            )
+
+            if result.stderr:
+                for line in result.stderr.strip().split("\n"):
+                    print(f"    {line}")
+
+            if result.returncode != 0:
+                print(f"  ERROR: Process exited with code {result.returncode}")
+                print(f"  STDERR: {result.stderr}")
+                return []
+
+            if result.stdout.strip():
+                lines = result.stdout.strip().split('\n')
+                for line in reversed(lines):
+                    line = line.strip()
+                    if line.startswith('[') and line.endswith(']'):
+                        try:
+                            return json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                try:
+                    return json.loads(result.stdout.strip())
+                except json.JSONDecodeError:
+                    print(f"  WARNING: Could not parse JSON from stdout")
+                    print(f"  STDOUT (first 500 chars): {result.stdout[:500]}")
+                    return []
+            return []
+        finally:
+            os.unlink(config_path)
+            os.unlink(tasks_path)
+
     def _run_model_in_env(
         self,
         model_type: str,
@@ -228,6 +306,10 @@ class TTSPipeline:
         output_dir: Path,
     ) -> List[dict]:
         """Run model synthesis in its dedicated conda environment."""
+        # API model types: run directly without conda wrapping
+        if model_type in API_MODEL_TYPES:
+            return self._run_api_model(model_type, model_config, tasks, output_dir)
+
         env_name = MODEL_ENV_MAP.get(model_type)
         if not env_name:
             raise ValueError(f"No environment mapping for model type: {model_type}")

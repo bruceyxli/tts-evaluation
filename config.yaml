@@ -83,7 +83,7 @@ models:
   - name: "cosyvoice"
     type: "cosyvoice"
     enabled: true
-    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    model_path: "./CosyVoice/pretrained_models/CosyVoice2-0.5B"
     repo_path: "./CosyVoice"
     mode: "zero_shot"  # zero_shot, cross_lingual, instruct
     # Voice cloning settings (zero_shot mode)
@@ -93,7 +93,7 @@ models:
   - name: "cosyvoice_rl"
     type: "cosyvoice_rl"
     enabled: true
-    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    model_path: "./CosyVoice/pretrained_models/CosyVoice2-0.5B"
     repo_path: "./CosyVoice"
     mode: "zero_shot"
     # Voice cloning with Yang's voice (male)
@@ -106,8 +106,9 @@ models:
   # Requires onnxruntime-gpu for best performance
   - name: "cosyvoice_vllm"
     type: "cosyvoice_vllm"
-    enabled: false  # Enable for vLLM comparison test
-    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    enabled: true
+
+    model_path: "./CosyVoice/pretrained_models/CosyVoice2-0.5B"
     repo_path: "./CosyVoice"
     mode: "zero_shot"
     fp16: false
@@ -120,7 +121,7 @@ models:
   - name: "cosyvoice_vllm_single"
     type: "cosyvoice_vllm"
     enabled: false  # Enable for single-batch vs batch comparison
-    model_path: "./CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B"
+    model_path: "./CosyVoice/pretrained_models/CosyVoice2-0.5B"
     repo_path: "./CosyVoice"
     mode: "zero_shot"
     fp16: false
@@ -128,6 +129,67 @@ models:
     single_batch: true  # Process one request at a time (no streaming)
     prompt_wav: "./processed_audio/normalized_Yang.wav"
     prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+
+  # ========================
+  # API-based models (connect to running vLLM-Omni server)
+  # Requires: vllm-omni serve running on the specified host:port
+  # ========================
+
+  # Qwen3-TTS via API (CustomVoice - predefined speaker)
+  - name: "qwen_tts_api"
+    type: "qwen_tts_api"
+    enabled: false
+    api_base: "http://localhost:8000"
+    api_key: "EMPTY"
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
+    speaker: "Vivian"
+    language: "English"
+    max_new_tokens: 2048
+    api_timeout: 300.0
+
+  # Qwen3-TTS via API (Voice Cloning with Yang's voice - Base model)
+  - name: "qwen_tts_api_vc"
+    type: "qwen_tts_api_vc"
+    enabled: false
+    api_base: "http://localhost:8000"
+    api_key: "EMPTY"
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    language: "English"
+    ref_audio: "./processed_audio/normalized_Yang.wav"
+    ref_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    mode: "icl"  # "icl" or "xvec_only"
+    max_new_tokens: 2048
+    api_timeout: 300.0
+
+  # Qwen3-TTS API VC with concurrency=2 (batch_size=2)
+  - name: "qwen_tts_api_vc_batch2"
+    type: "qwen_tts_api_vc"
+    enabled: true
+    api_base: "http://localhost:8000"
+    api_key: "EMPTY"
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    language: "English"
+    ref_audio: "./processed_audio/normalized_Yang.wav"
+    ref_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    mode: "icl"
+    concurrency: 2
+    max_new_tokens: 2048
+    api_timeout: 300.0
+
+  # Qwen3-TTS API VC with concurrency=5 (batch_size=5)
+  - name: "qwen_tts_api_vc_batch5"
+    type: "qwen_tts_api_vc"
+    enabled: true
+    api_base: "http://localhost:8000"
+    api_key: "EMPTY"
+    model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    language: "English"
+    ref_audio: "./processed_audio/normalized_Yang.wav"
+    ref_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    mode: "icl"
+    concurrency: 5
+    max_new_tokens: 2048
+    api_timeout: 300.0
 
 # Test scripts
 # Use --scripts (-s) flag to load from external file

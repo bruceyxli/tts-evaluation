@@ -1,0 +1,42 @@
+[
+  {
+    "id": "code_python_001",
+    "category": "code",
+    "language": "en",
+    "difficulty": "easy",
+    "domain": "CS",
+    "text": "def factorial(n):\n    if n == 0:\n        return 1\n    return n * factorial(n - 1)"
+  },
+  {
+    "id": "code_java_001",
+    "category": "code",
+    "language": "en",
+    "difficulty": "easy",
+    "domain": "CS",
+    "text": "public static void main(String[] args) {\n    System.out.println(\"Hello World\");\n}"
+  },
+  {
+    "id": "notes_sql_001",
+    "category": "notes",
+    "language": "en",
+    "difficulty": "easy",
+    "domain": "CS",
+    "text": "## Relational Model Terminology\n\n| Term | Alias |\n|------|-------|\n| Table | Relation |\n| Row | Tuple, Record |\n| Column | Attribute, Field |"
+  },
+  {
+    "id": "math_001",
+    "category": "math",
+    "language": "en",
+    "difficulty": "easy",
+    "domain": "Math",
+    "text": "x\u00b2 + 2x - 3 = 0"
+  },
+  {
+    "id": "tutor_001",
+    "category": "tutor",
+    "language": "en",
+    "difficulty": "easy",
+    "domain": "CS",
+    "text": "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+  }
+]

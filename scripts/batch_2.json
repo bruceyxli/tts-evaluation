@@ -1,0 +1,18 @@
+[
+  {
+    "id": "code_python_001",
+    "category": "code",
+    "language": "en",
+    "difficulty": "easy",
+    "domain": "CS",
+    "text": "def factorial(n):\n    if n == 0:\n        return 1\n    return n * factorial(n - 1)"
+  },
+  {
+    "id": "tutor_001",
+    "category": "tutor",
+    "language": "en",
+    "difficulty": "easy",
+    "domain": "CS",
+    "text": "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+  }
+]

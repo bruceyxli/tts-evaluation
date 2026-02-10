@@ -1,5 +1,13 @@
 # TTS Evaluation Project Notes
 
+## 评估默认设置
+
+**所有 TTS 模型默认使用 Voice Cloning（声音克隆）+ Yang 的声音进行测试。**
+
+- 参考音频: `./processed_audio/normalized_Yang.wav`
+- 参考文本: `"Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."`
+- 这确保所有模型在相同条件下进行公平对比（相同说话人、相同参考音频）
+
 ## 项目架构
 
 本项目使用**独立 conda 环境**运行不同的 TTS 模型，避免依赖冲突。
@@ -17,12 +25,15 @@
 | `cosyvoice` | `tts-cosyvoice` | CosyVoice (Fun-CosyVoice3-0.5B) |
 | `cosyvoice_rl` | `tts-cosyvoice` | CosyVoice + RL 权重 (llm.rl.pt) |
 | `cosyvoice_vllm` | `tts-cosyvoice-vllm` | vLLM 加速 (Linux only) |
+| `qwen_tts_api` | *(none)* | API 模式：连接运行中的 vLLM-Omni 服务器 |
+| `qwen_tts_api_vc` | *(none)* | API Voice Cloning (Base model via server) |
 
 ### 关键文件
 
 - `main.py` - 主入口，通过 subprocess 自动切换环境
 - `model_runner.py` - 在隔离环境中执行的模型加载和合成脚本
 - `model_runner_vllm.py` - vLLM-Omni 专用推理脚本 (高性能)
+- `model_runner_api.py` - API 推理脚本 (HTTP 请求到 vLLM-Omni 服务器)
 - `setup_models.py` - 创建 conda 环境和下载模型
 - `envs/*.yaml` - 各环境的 conda 配置文件
 
@@ -76,6 +87,9 @@ model.model.llm.load_state_dict(state_dict, strict=False)
 3. 在 `model_runner.py` 添加 `load_xxx()` 和 `synthesize_xxx()` 函数
 4. 在 `main.py` 的 `MODEL_ENV_MAP` 添加映射
 
+**API 模型**：如果模型通过 HTTP API 访问（无需本地加载），添加到 `API_MODEL_TYPES` 集合，
+在 `MODEL_ENV_MAP` 中设为 `None`，推理逻辑写在 `model_runner_api.py`。
+
 ## 常用命令
 
 ```bash
@@ -116,6 +130,7 @@ conda run -n tts-glm python -c "import torch; print(torch.cuda.is_available())"
 | CosyVoice | ✅ 支持 | `inference_bistream()` 原生支持 |
 | GLM-TTS | ⚠️ 可实现 | 有 `token2wav_stream()` 但需要额外集成 |
 | Qwen3-TTS | ❌ 不支持 | qwen-tts 库不暴露 streaming API |
+| Qwen3-TTS (API) | ❌ 不支持 | REST endpoint 返回完整音频 |
 
 #### Qwen3-TTS Streaming 说明
 
@@ -351,6 +366,60 @@ python main.py -m qwen_tts_vllm -s scripts/single_test.json
 | `qwen-tts` 原生 | ~0.3-0.5 | 简单、稳定 |
 | `vLLM-Omni` (batch) | ~0.1-0.2 | 更快，支持批量 |
 | `vLLM-Omni` (single) | ~0.2-0.3 | 测量单请求开销 |
+| `vLLM-Omni` (API) | 取决于网络 | 评估 served deployment 性能 |
+
+### API-based Models (qwen_tts_api)
+
+`qwen_tts_api` 和 `qwen_tts_api_vc` 连接到运行中的 vLLM-Omni 服务器，
+通过 `/v1/audio/speech` OpenAI-compatible endpoint 进行推理。
+不需要在本地加载模型，也不需要 conda 环境。
+
+#### 前提条件
+
+1. 启动 vLLM-Omni 服务器：
+```bash
+# CustomVoice
+conda run -n tts-qwen-vllm vllm-omni serve "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice" \
+    --stage-configs-path vllm-omni/vllm_omni/model_executor/stage_configs/qwen3_tts.yaml \
+    --host 0.0.0.0 --port 8000 \
+    --gpu-memory-utilization 0.9 \
+    --trust-remote-code --enforce-eager --omni
+
+# Voice Cloning (Base model)
+conda run -n tts-qwen-vllm vllm-omni serve "Qwen/Qwen3-TTS-12Hz-0.6B-Base" \
+    --stage-configs-path vllm-omni/vllm_omni/model_executor/stage_configs/qwen3_tts.yaml \
+    --host 0.0.0.0 --port 8000 \
+    --gpu-memory-utilization 0.9 \
+    --trust-remote-code --enforce-eager --omni
+```
+
+2. 安装依赖：`pip install httpx soundfile`
+
+#### 使用方式
+
+```yaml
+# CustomVoice (预设说话人)
+- name: "qwen_tts_api"
+  type: "qwen_tts_api"
+  api_base: "http://localhost:8000"
+  speaker: "Vivian"
+  language: "English"
+
+# Voice Cloning (声音克隆)
+- name: "qwen_tts_api_vc"
+  type: "qwen_tts_api_vc"
+  api_base: "http://localhost:8000"
+  ref_audio: "./processed_audio/normalized_Yang.wav"
+  ref_text: "参考音频文本"
+  mode: "icl"  # "icl" 或 "xvec_only"
+```
+
+#### 注意事项
+
+- First Token Latency 返回 `null`（REST API 非流式）
+- RTF 包含网络延迟（HTTP round-trip），结果中 `backend: "vllm-omni-api"` 可区分
+- 适合评估 served deployment 场景下的端到端性能
+- 服务器未启动时，每个 task 会单独报错，不会中断整个 pipeline
 
 ### CosyVoice vLLM 加速
 
