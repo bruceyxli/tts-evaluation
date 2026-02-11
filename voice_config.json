@@ -1,0 +1,10 @@
+{
+  "Professor Allen Yang": {
+    "prompt_wav": "./processed_audio/normalized_Yang.wav",
+    "prompt_text": "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+  },
+  "Professor John DeNero": {
+    "prompt_wav": "./processed_audio/normalized_DeNero.wav",
+    "prompt_text": "In this course, we've discussed trees many times."
+  }
+}
