@@ -131,6 +131,20 @@ models:
     prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
 
   # ========================
+  # CosyVoice vLLM API (connect to running CosyVoice server)
+  # Start: conda run -n tts-cosyvoice-vllm python cosyvoice_server_vllm.py --port 50000
+  # ========================
+
+  - name: "cosyvoice_vllm_api"
+    type: "cosyvoice_vllm_api"
+    enabled: true
+    api_base: "http://localhost:50000"
+    mode: "zero_shot"
+    prompt_wav: "./processed_audio/normalized_Yang.wav"
+    prompt_text: "Hello everyone, welcome back to CS294-137. Today, we will continue our discussion in computer vision."
+    api_timeout: 300.0
+
+  # ========================
   # API-based models (connect to running vLLM-Omni server)
   # Requires: vllm-omni serve running on the specified host:port
   # ========================
@@ -164,7 +178,7 @@ models:
   # Qwen3-TTS API VC with concurrency=2 (batch_size=2)
   - name: "qwen_tts_api_vc_batch2"
     type: "qwen_tts_api_vc"
-    enabled: true
+    enabled: false
     api_base: "http://localhost:8000"
     api_key: "EMPTY"
     model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
@@ -179,7 +193,7 @@ models:
   # Qwen3-TTS API VC with concurrency=5 (batch_size=5)
   - name: "qwen_tts_api_vc_batch5"
     type: "qwen_tts_api_vc"
-    enabled: true
+    enabled: false
     api_base: "http://localhost:8000"
     api_key: "EMPTY"
     model_id: "Qwen/Qwen3-TTS-12Hz-0.6B-Base"

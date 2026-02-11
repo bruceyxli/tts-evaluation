@@ -27,13 +27,14 @@ MODEL_ENV_MAP = {
     "cosyvoice_vllm": "tts-cosyvoice-vllm",  # CosyVoice with vLLM acceleration (Linux only)
     "qwen_tts_api": None,      # API-based, no conda env needed
     "qwen_tts_api_vc": None,   # API-based, no conda env needed
+    "cosyvoice_vllm_api": None,  # API-based, CosyVoice vLLM server
 }
 
 # Model types that use vLLM runner
 VLLM_MODEL_TYPES = {"qwen_tts_vllm", "qwen_tts_vllm_vc"}
 
 # Model types that use API runner (no conda environment needed)
-API_MODEL_TYPES = {"qwen_tts_api", "qwen_tts_api_vc"}
+API_MODEL_TYPES = {"qwen_tts_api", "qwen_tts_api_vc", "cosyvoice_vllm_api"}
 
 
 class TTSPipeline:
@@ -234,7 +235,10 @@ class TTSPipeline:
         output_dir: Path,
     ) -> List[dict]:
         """Run model synthesis via API (no conda environment needed)."""
-        runner_script = self.project_root / "model_runner_api.py"
+        if model_type == "cosyvoice_vllm_api":
+            runner_script = self.project_root / "model_runner_cosyvoice_api.py"
+        else:
+            runner_script = self.project_root / "model_runner_api.py"
 
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete=False, encoding="utf-8"
